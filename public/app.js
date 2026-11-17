@@ -442,8 +442,16 @@ function pickPlace(p) {
   $('locCard').innerHTML = `${icon('pin')}<div><b>${esc(p.addr || 'Location picked on the map')}</b>
     <small>${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}${p.osm ? ' · OpenStreetMap place' : p.dropped ? ' · dropped pin' : ''}</small>
     ${listed ? `<div style="margin-top:6px;color:#b4361b;font-weight:700">Already on the map nearby: ${esc(listed.s.name)} (${Math.round(listed.d * 1000)} m away)</div>` : ''}</div>`;
-  $('formBack').hidden = false; (p.name ? f.org : f.name).focus(); loadTurnstile();
+  $('formBack').hidden = false; $('siteForm').scrollTop = 0; loadTurnstile();
+  // on a computer, put the cursor in the first box; on a phone don't, as the keyboard popping up straight away shoves the page about
+  if (!matchMedia('(pointer: coarse)').matches) (p.name ? f.org : f.name).focus();
 }
+// phones: keep the box being typed in visible inside the card, and undo any page scroll the keyboard leaves behind
+$('siteForm').addEventListener('focusin', e => {
+  if (!matchMedia('(pointer: coarse)').matches || !e.target.matches('input, textarea, select')) return;
+  setTimeout(() => e.target.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 300);
+});
+document.addEventListener('focusout', () => setTimeout(() => { if (window.scrollY || window.scrollX) window.scrollTo(0, 0); }, 120));
 $('formBack').addEventListener('click', e => { if (e.target === $('formBack') || e.target.closest('[data-close]')) $('formBack').hidden = true; });
 
 // "I'm human" check (Cloudflare Turnstile): only loaded when the form opens, sets no cookies
