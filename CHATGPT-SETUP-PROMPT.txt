@@ -1,0 +1,196 @@
+=====================================================================
+SCOUT CAMPSITE FINDER: SETUP GUIDE FOR AN AI ASSISTANT
+Copy EVERYTHING in this file and paste it into ChatGPT (or Claude, Gemini, etc.) as your first message.
+The code lives on GitHub: https://github.com/FredFree83/scout-campsite-finder
+=====================================================================
+
+HELLO ASSISTANT. Please read all of this before replying.
+
+There is a finished website on GitHub at https://github.com/FredFree83/scout-campsite-finder : a public map of Scout and Guide campsites. I want my own copy of it. I need to put it online using MY OWN free accounts: Cloudflare (hosting) and Google (a Google Sheet that stores the list of sites). I am not technical. Please be my patient step-by-step guide.
+
+HOW TO GUIDE ME
+- Start by asking whether I'm on a Mac or Windows, then use the right instructions for that.
+- Give me ONE step at a time. Wait for me to say "done" (or paste what I see) before the next step.
+- Tell me exactly what to click and what to type. Put every command in its own code block so I can copy it.
+- When I paste an error, explain it simply and tell me how to fix it. The "Troubleshooting" section below covers the common ones.
+- SECURITY: never ask me to paste a password, secret key or the contents of my notes file into this chat. When a step needs one, tell me where to paste it myself (a Terminal prompt, a Google setting, etc.). Public things (the site address, the Turnstile SITE key, the Apps Script web app address, the KV id) are fine to share with you.
+- Keep a short checklist of which steps are done, and show it every few steps.
+- If something here doesn't match what I see (websites change their buttons), help me find the nearest equivalent.
+
+---------------------------------------------------------------------
+WHAT'S IN THE REPOSITORY (for your reference)
+---------------------------------------------------------------------
+public/                  the website (2D map, optional 3D globe, styles, map libraries)
+src/worker.js            the Cloudflare "Worker" (server script)
+google-apps-script/Code.gs   script that goes inside the Google Sheet
+data/campsites.xlsx      all 538 sites, ready to import into Google Sheets
+wrangler.jsonc           Cloudflare settings: has 3 placeholders to fill in:
+                           PASTE_KV_ID_HERE, PASTE_TURNSTILE_SITE_KEY_HERE, PASTE_APPS_SCRIPT_URL_HERE
+package.json             tools list (Cloudflare's "wrangler" tool)
+README.md, SETUP.md, docs/HOW-IT-WORKS.md, CLAUDE.md   documentation
+
+How it works: the website runs on Cloudflare. Every 10 minutes the Worker reads the Google Sheet and shows every row whose Status is "Approved". Visitors can suggest new sites. Suggestions arrive in the Sheet as "Pending" for a volunteer to approve. There are no cookies and no tracking.
+
+Three passwords/keys get made during setup. NONE are in the repository:
+  1. "Sheet password": the website uses it to talk to the Google Sheet's script
+  2. "Refresh password": the Sheet uses it to tell the website to update straight away
+  3. "Turnstile secret key": from Cloudflare, for the "I'm human" check on the Add form
+
+---------------------------------------------------------------------
+THE STEPS (guide me through these in order)
+---------------------------------------------------------------------
+
+STEP 0: Things I need
+- A computer (Mac or Windows) where I can install programs.
+- A Google account, an email address for a new free Cloudflare account, and a free GitHub account (https://github.com/signup).
+- Install Git: Mac: run   git --version   in Terminal; if it isn't there, macOS offers to install it, so say yes. Windows: install from https://git-scm.com/download/win (accept the defaults).
+- Install Node.js "LTS" from https://nodejs.org (accept the defaults). Then check it works in Terminal (Mac) or PowerShell (Windows):
+    node -v
+  It should print v20 or higher.
+
+STEP 1: Get your own copy of the code from GitHub
+- Sign in to GitHub, open https://github.com/FredFree83/scout-campsite-finder and click "Fork" (top right) → "Create fork".
+  This makes YOUR OWN copy at https://github.com/YOUR-GITHUB-NAME/scout-campsite-finder, so your changes are kept separate from the original.
+- Open Terminal (Mac) or PowerShell (Windows), go to your Documents folder, and download (clone) your fork:
+    cd Documents
+    git clone https://github.com/YOUR-GITHUB-NAME/scout-campsite-finder.git
+    cd scout-campsite-finder
+  (Replace YOUR-GITHUB-NAME with your GitHub username.)
+- If Git asks you to sign in, follow its prompts (a browser window opens to GitHub).
+- Check you're in the right place: Mac "ls", Windows "dir". You should see package.json and wrangler.jsonc.
+- (No Git? On the GitHub page click the green "Code" button → "Download ZIP", unzip it, and open a Terminal in that folder instead. You then miss out on saving changes back to GitHub.)
+
+STEP 2: Install the tools
+    npm install
+- This downloads Cloudflare's "wrangler" tool into the folder. Warnings are normal.
+- If it mentions "install-scripts" or "allowScripts": the approvals are already in package.json. If wrangler later fails with a missing "workerd" error, run:
+    npm install-scripts approve workerd
+    npm install-scripts approve esbuild
+    npm rebuild
+
+STEP 3: Make two passwords and keep them safe
+- Run this TWICE. Each run prints a different long random password:
+    node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"
+- Make a private note (a file called .secrets.local in this folder is fine; it's excluded from uploads, or use a password manager):
+    Sheet password:   (first one)
+    Refresh password: (second one)
+- Do NOT paste them into this chat.
+
+STEP 4: Make the Google Sheet from the Excel file
+- Go to https://sheets.new (makes a blank Google Sheet). Name it e.g. "Scout campsites".
+- File → Import → Upload → choose data/campsites.xlsx from your downloaded folder (or download it from https://github.com/FredFree83/scout-campsite-finder/raw/main/data/campsites.xlsx) → Import location: "Replace spreadsheet" → Import data.
+- Check the first tab is called exactly   Submissions   (rename it if not) and row 1 has headings (ID, Submitted, Status, Name, …). There should be 538 sites.
+- The "Read me" tab can be deleted.
+
+STEP 5: Add the script to the Sheet
+- In the Sheet: Extensions → Apps Script.
+- Delete everything in the code box. Easiest way to copy the script: open https://github.com/FredFree83/scout-campsite-finder/blob/main/google-apps-script/Code.gs and click the "Copy raw file" button (two overlapping squares, top right of the code). Paste it in the Apps Script code box. Press Save (the disk icon).
+  (Or open google-apps-script/Code.gs from your downloaded folder in a plain-text editor such as VS Code or Notepad, copy all, paste.)
+- Click Project Settings (cog, left side) → Script properties → Add script property:
+    Property: SECRET    Value: (your Sheet password)
+  Optionally also:   NOTIFY   = an email address to be told when new suggestions arrive.
+  Click "Save script properties".
+- Back in Editor (<> icon): in the dropdown next to "Debug" choose   setup   → press Run.
+  Google asks for permission: choose your account → "Advanced" → "Go to … (unsafe)" → Allow. That warning is normal for your own scripts.
+  The run log should finish without a red error.
+- Deploy → New deployment → click the cog next to "Select type" → Web app.
+    Description: anything.  Execute as: Me.  Who has access: Anyone.
+  Deploy → copy the "Web app URL" (ends in /exec). Share this address with the assistant (it's not secret by itself).
+  ("Anyone" just means the website can reach it. The script refuses anything without the Sheet password.)
+
+STEP 6: Cloudflare account and sign-in
+- Make a free account at https://dash.cloudflare.com/sign-up and confirm the email.
+- In the Terminal:
+    npx wrangler login
+  A browser page opens. Check it's dash.cloudflare.com, then click Allow. The Terminal should say "Successfully logged in".
+
+STEP 7: Create the storage space
+    npx wrangler kv namespace create SITES
+- It prints an "id" (a long string of letters/numbers). If it asks "Would you like Wrangler to add it on your behalf?", answer No.
+- Open wrangler.jsonc in a text editor. Replace   PASTE_KV_ID_HERE   with that id (keep the quote marks).
+- Also replace   PASTE_APPS_SCRIPT_URL_HERE   with the Web app URL from step 5. Save the file.
+
+STEP 8: Put the site online the first time
+    npx wrangler deploy
+- If it asks to register a workers.dev subdomain, pick a name (it becomes part of the web address).
+- At the end it prints the address, like  https://scout-campsite-finder.YOURNAME.workers.dev . Note it down.
+- If it says "This Worker does not exist on your account [code: 10007]", wait 10 seconds and run the same command again (a known timing hiccup on the first deploy).
+
+STEP 9: The "I'm human" check (Turnstile)
+- In the Cloudflare dashboard (dash.cloudflare.com): find "Turnstile" (use the search box) → Add widget.
+    Widget name: Scout Campsite Finder
+    Hostnames: type your site address WITHOUT https:// and without a trailing /  (e.g. scout-campsite-finder.YOURNAME.workers.dev), press Enter so it's added
+    Widget mode: Managed.  Pre-clearance: No.  → Create.
+- Copy the SITE key → in wrangler.jsonc replace PASTE_TURNSTILE_SITE_KEY_HERE with it. Save.
+- The SECRET key: don't share it in the chat. In the Terminal run:
+    npx wrangler secret put TURNSTILE_SECRET
+  and paste the Secret key when it asks (it won't show as you paste; that's normal), then Enter.
+- While in the dashboard: make sure Security → Bots → "Bot Fight Mode" is OFF (it would add a cookie).
+
+STEP 10: Give Cloudflare the two passwords
+    npx wrangler secret put APPS_SCRIPT_SECRET
+  → paste the Sheet password, Enter.
+    npx wrangler secret put REFRESH_SECRET
+  → paste the Refresh password, Enter.
+  Type each command exactly as shown. Don't replace the CAPITAL words; they're the names. Paste the password only when it asks.
+
+STEP 11: Publish again with everything filled in
+    npx wrangler deploy
+
+STEP 12: Let the Sheet tell the site to update straight away
+- Apps Script → Project Settings → Script properties → Add:
+    Property: REFRESH_URL
+    Value:    https://YOUR-SITE-ADDRESS/api/refresh?key=YOUR-REFRESH-PASSWORD
+  (your real address from step 8 and your Refresh password from step 3, no spaces). Save.
+  This one does NOT need a new deployment.
+
+STEP 13: Build the list for the first time
+- Mac:
+    curl -X POST "https://YOUR-SITE-ADDRESS/api/refresh?key=YOUR-REFRESH-PASSWORD"
+- Windows PowerShell:
+    Invoke-RestMethod -Method Post -Uri "https://YOUR-SITE-ADDRESS/api/refresh?key=YOUR-REFRESH-PASSWORD"
+  (Or just wait 10 minutes: it happens automatically.)
+- The reply should include  "ok":true  and  "fromSheet":538 . (Countries for these sites are already worked out. New sites added later get theirs within a run or two.)
+- Visit https://YOUR-SITE-ADDRESS/api/status any time to check.
+
+STEP 14: Check it all works (in a normal browser, e.g. Chrome or Safari)
+- Open https://YOUR-SITE-ADDRESS: the map should show the sites. Try a postcode in "Near".
+- Click "3D version" for the globe, and "2D map" to come back.
+- Click "Add a site" → search a place → fill in the form, name it "TEST – please reject" → Send for review.
+- In the Sheet, a new row should appear with Status "Pending". Set it to "Approved". Within 10 minutes (usually under a minute) it shows on the map after a reload. Then set it to "Rejected" and it disappears.
+
+SAVING YOUR SETTINGS TO YOUR GITHUB COPY (recommended)
+- Your wrangler.jsonc now holds your storage id, Turnstile site key and Apps Script address. None of these are passwords, so they're fine to save to your fork:
+    git add wrangler.jsonc
+    git commit -m "My Cloudflare and Sheet settings"
+    git push
+- NEVER add .secrets.local or .dev.vars to GitHub (they're already excluded by .gitignore). If your fork is public, remember anyone can read it.
+
+DONE. Day to day:
+- Approve, reject or edit sites in the Sheet. Use "Rejected" rather than deleting rows.
+- If Code.gs is ever changed: paste the new version → Save → run "setup" → Deploy → Manage deployments → pencil → Version "New version" → Deploy (keeps the same address).
+- After changing any website files: npx wrangler deploy  (and git add / commit / push to keep your GitHub copy up to date)
+- To get improvements from the original project later: on your fork's GitHub page click "Sync fork", then run   git pull   and   npx wrangler deploy
+
+OPTIONAL EXTRAS
+- Your own web address: Cloudflare dashboard → Workers & Pages → scout-campsite-finder → Settings → Domains & Routes → Add → Custom domain. Then add that domain to the Turnstile widget's hostnames and update REFRESH_URL.
+- A shared Google Maps list whose new places should arrive in the Sheet as Pending: put the list's ID (the part after /placelists/list/ in its link) in "GOOGLE_LIST_ID" in wrangler.jsonc and deploy. This uses an unofficial Google feature that sometimes says "too many requests"; the site copes and retries every 6 hours.
+
+---------------------------------------------------------------------
+TROUBLESHOOTING (for the assistant)
+---------------------------------------------------------------------
+- "node" / "npm" not found → Node.js not installed, or the Terminal was open before installing: close and reopen it.
+- npm install-scripts / workerd / esbuild errors → see step 2.
+- A warning that "fsevents" has install scripts not covered → harmless (an optional Mac file-watching helper). Ignore it.
+- Deploy error code 10007 on the first deploy → run deploy again.
+- Map shows no sites → a filter may be on (the header says "0 of …"). Reload without the part after # in the address. Check /api/status.
+- /api/status says "Sheet: not allowed" → the SECRET Script property and the APPS_SCRIPT_SECRET Cloudflare secret don't match. Re-enter both with the same Sheet password.
+- /api/status says "the Sheet script is an old version" → the web app wasn't redeployed after pasting Code.gs: Deploy → Manage deployments → pencil → New version → Deploy.
+- "Adding sites is not switched on yet" → APPS_SCRIPT_URL is still the placeholder, or APPS_SCRIPT_SECRET wasn't set. Fix, then deploy.
+- "Please tick the I'm human check" or Turnstile error 110200 → the site address isn't in the Turnstile widget's Hostnames (or has https:// or a / in it).
+- Turnstile error 600010 → the browser looks automated (e.g. some built-in/test browsers). Use a normal browser.
+- Approved sites take up to 10 minutes → normal. To make it instant, check the REFRESH_URL Script property, and in Apps Script → Executions look for errors from "onStatusChange". Running "setup" again recreates the trigger.
+- The site shows sites but "Run by"/"Type" look odd → they come from the "Run by" and "Types" columns. Allowed values:
+    Run by: Scouts, Scouts & Guides, Girlguiding, Scout Adventures, Overseas scouting, Other / unknown
+    Types (comma separated): Camping, Indoor, Activity centre, Scout hut / HQ, Water / waterside, Restricted / check first
+=====================================================================

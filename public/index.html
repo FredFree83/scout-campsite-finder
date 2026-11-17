@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<title>Scout Campsite Finder</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="vendor/leaflet.css">
+<link rel="stylesheet" href="vendor/MarkerCluster.css">
+<link rel="stylesheet" href="glass.css?v=13">
+</head>
+<body>
+<div id="map"></div>
+<div class="glass loading" id="loading"><span class="spin"></span>Loading sites…</div>
+
+<!-- top bar -->
+<header class="bar">
+  <div class="glass brand">
+    <span class="brand-mark"><svg viewBox="0 0 64 64"><g transform="translate(32 32) scale(.7) translate(-32 -32)" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 52 32 11l24 41z"/><path d="M24 52l8-13 8 13"/></g></svg></span>
+    <div><h1>Scout Campsite Finder</h1><p id="headCount">Loading sites…</p></div>
+  </div>
+  <div class="glass tools">
+  <div class="seg" id="layers">
+    <button data-l="sat" class="active" title="Satellite" aria-label="Satellite"><svg><use href="#i-sat"/></svg><span class="lbl">Satellite</span></button>
+    <button data-l="osm" title="Map" aria-label="Map"><svg><use href="#i-map"/></svg><span class="lbl">Map</span></button>
+    <button data-l="topo" title="Terrain" aria-label="Terrain"><svg><use href="#i-mountain"/></svg><span class="lbl">Terrain</span></button>
+  </div>
+  <a class="btn" id="to3d" href="globe" title="Open the 3D globe view" aria-label="3D version"><svg><use href="#i-cube"/></svg><span class="lbl">3D version</span></a>
+  <button class="btn btn-primary" id="addBtn"><svg><use href="#i-plus"/></svg>Add a site</button>
+  </div>
+</header>
+
+<!-- side panel -->
+<aside class="glass panel" id="panel">
+  <button class="mobile-toggle" id="mToggle" aria-expanded="false"></button>
+  <div class="controls">
+    <label class="field search"><svg><use href="#i-search"/></svg><input id="q" type="search" placeholder="Search sites by name, town or note" autocomplete="off"></label>
+    <form class="near" id="nearForm">
+      <label class="field"><svg><use href="#i-pin"/></svg><input id="nearQ" placeholder="Near a postcode or town" autocomplete="off"></label>
+      <button class="btn" id="goNear">Nearest</button>
+      <button class="btn icon" type="button" id="goMe" title="Use my location"><svg><use href="#i-locate"/></svg></button>
+    </form>
+    <div class="near-status" id="nearStatus"></div>
+    <div class="chips dist-chips" id="fDist" hidden></div>
+
+    <div class="filter-bar">
+      <button class="filter-toggle" id="filterToggle" aria-expanded="true"><svg><use href="#i-sliders"/></svg>Filters <span class="fcount" id="fCount" hidden></span><svg class="chev"><use href="#i-chev"/></svg></button>
+      <select id="sort" class="select" title="Sort the list">
+        <option value="name">A to Z</option><option value="near" disabled>Nearest first</option><option value="country">By country</option>
+      </select>
+    </div>
+    <div class="filters" id="filters">
+      <div class="group">
+        <div class="group-head"><span>Where</span>
+          <select id="fCountry" class="select"><option value="">All countries</option></select>
+        </div>
+        <div class="chips" id="fRegion"></div>
+      </div>
+      <div class="group"><div class="group-head"><span>Run by</span></div><div class="chips" id="fOrg"></div></div>
+      <div class="group"><div class="group-head"><span>Type</span></div><div class="chips" id="fKind"></div></div>
+    </div>
+    <div class="active-row" id="activeRow" hidden></div>
+  </div>
+  <div class="list" id="list"><div class="empty"><span class="spin"></span></div></div>
+</aside>
+
+<!-- add-a-site bar -->
+<div class="glass addbar" id="addbar" hidden>
+  <div class="addbar-head">
+    <div><h2>Add a site</h2><p>Click a campsite on the map, search for a place, or click anywhere to drop a pin.</p></div>
+    <button class="dialog-x" id="addClose" title="Cancel"><svg><use href="#i-x"/></svg></button>
+  </div>
+  <label class="field search"><svg><use href="#i-search"/></svg><input id="placeQ" placeholder="Search a place, e.g. Manor Farm Country Park" autocomplete="off"></label>
+  <div class="results" id="placeResults"></div>
+  <div class="addbar-status" id="candStatus"></div>
+</div>
+
+<!-- add-a-site form -->
+<div class="dialog-backdrop" id="formBack" hidden>
+  <form class="dialog" id="siteForm">
+    <button type="button" class="dialog-x" data-close title="Close"><svg><use href="#i-x"/></svg></button>
+    <h2>New site</h2>
+    <div class="loc-card" id="locCard"></div>
+    <label class="f"><span>Site name</span><input class="input" name="name" required maxlength="120" placeholder="e.g. Cricket Campsite"></label>
+    <label class="f"><span>Address</span><input class="input" name="addr" maxlength="300" placeholder="Road, town, postcode"></label>
+    <div class="row">
+      <label class="f"><span>Run by</span><select class="input" name="org"></select></label>
+      <label class="f"><span>Managed by</span><input class="input" name="managedBy" maxlength="150" placeholder="e.g. Hampshire Scouts"></label>
+    </div>
+    <div class="f"><span>Type</span><div class="chips" id="formKinds"></div></div>
+    <div class="row">
+      <label class="f"><span>Booking website</span><input class="input" name="url" type="url" maxlength="300" placeholder="https://"></label>
+      <label class="f"><span>Contact email</span><input class="input" name="email" type="email" maxlength="120" placeholder="bookings@…"></label>
+    </div>
+    <label class="f"><span>How to book (if not online)</span><input class="input" name="bookingNote" maxlength="120" placeholder="e.g. Phone 01234 567890, or email the warden"></label>
+    <label class="f"><span>Notes</span><textarea class="input" name="note" rows="3" maxlength="1000" placeholder="Entrance, facilities, anything useful"></textarea></label>
+    <p class="fine">Only add a contact email or phone number that the site already publishes.</p>
+    <label class="f"><span>Your name or group (optional)</span><input class="input" name="by" placeholder="e.g. 1st Anytown Scouts"></label>
+    <div id="humanCheck"></div>
+    <p class="fine">Your suggestion is checked by a volunteer before it appears. Only what you type here is kept; no cookies, no tracking.</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn" data-close>Cancel</button>
+      <button class="btn btn-primary"><svg><use href="#i-send"/></svg>Send for review</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<!-- icons (stroke style) -->
+<!-- icons: the 1stpgss hub set (24 grid, 1.8 stroke, round ends) -->
+<svg width="0" height="0" style="position:absolute">
+  <defs>
+    <symbol id="i-tent" viewBox="0 0 24 24"><path d="M3 20 12 4l9 16M3 20h18M12 4v16M9 20l3-5 3 5"/></symbol>
+    <symbol id="i-house" viewBox="0 0 24 24"><path d="M3 11 12 3l9 8M5 9v12h14V9M10 21v-6h4v6"/></symbol>
+    <symbol id="i-compass" viewBox="0 0 24 24"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM15.5 8.5 13.5 13.5 8.5 15.5 10.5 10.5z"/></symbol>
+    <symbol id="i-wave" viewBox="0 0 24 24"><path d="M2 10c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2M2 16c2.5 0 2.5-2 5-2s2.5 2 5 2 2.5-2 5-2 2.5 2 5 2"/></symbol>
+    <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V3M5 4h12l-2 4 2 4H5"/></symbol>
+    <symbol id="i-sat" viewBox="0 0 24 24"><path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></symbol>
+    <symbol id="i-map" viewBox="0 0 24 24"><path d="M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3zM9 3v15M15 6v15"/></symbol>
+    <symbol id="i-mountain" viewBox="0 0 24 24"><path d="M2 20 9 7l4 6 2-3 7 10zM7.5 10.5 9 12l1.5-1.5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><path d="M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5 21 21"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21zM12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z"/></symbol>
+    <symbol id="i-locate" viewBox="0 0 24 24"><path d="M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2v4M12 18v4M2 12h4M18 12h4"/></symbol>
+    <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 12 20 4l-6 16-3-7-7-1z"/></symbol>
+    <symbol id="i-route" viewBox="0 0 24 24"><path d="M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM18 9a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM8 17h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></symbol>
+    <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v6H4V6h6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1M15 4v4M7 10v4M15 16v4"/></symbol>
+    <symbol id="i-cube" viewBox="0 0 24 24"><path d="M12 2.5 3.5 7v10l8.5 4.5 8.5-4.5V7zM3.5 7l8.5 4.5L20.5 7M12 11.5v10"/></symbol>
+    <symbol id="i-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  </defs>
+</svg>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/leaflet.markercluster.js"></script>
+<script type="module" src="app.js?v=11"></script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+# For testing on your own computer only (npm run dev). Copy this file to ".dev.vars".
+# These Turnstile test keys always pass. Never upload .dev.vars anywhere.
+TURNSTILE_SITE_KEY=1x00000000000000000000AA
+TURNSTILE_SECRET=1x0000000000000000000000000000000AA
+APPS_SCRIPT_URL=
+APPS_SCRIPT_SECRET=
+REFRESH_SECRET=local-test
